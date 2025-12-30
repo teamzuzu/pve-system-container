@@ -10,7 +10,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: proxmox-ve
+  IMAGE_NAME: LongQT-sea/proxmox-ve
 
 jobs:
   build:
