@@ -41,6 +41,10 @@ services:
       - "2222:22"
       - "8443:8443"
 ```
+Bring it up:
+```
+docker compose up -d
+```
 
 Set root password:
 ```

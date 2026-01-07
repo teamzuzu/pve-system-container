@@ -3,7 +3,7 @@
 Proxmox cluster in Docker. Learn, test, break, and repeat.
 
 - **Fast iteration** — Spin up, tear down, repeat in seconds
-- **Cluster simulation** — Test HA, failover, and live migration
+- **Cluster simulation** — Test live migration, clustering, and multi-node management
 - **Automation testing** — Validate Terraform, Ansible, or scripts
 - **Shared storage** — Mount ISOs, backups, and disk images across all nodes
 - **Dual-Stack Networking** — IPv4 and IPv6 support with pre-configured NAT bridges
@@ -54,7 +54,7 @@ Access the web UI at `https://localhost:8006/` (accept the self-signed cert).
 ---
 
 ## Multi-Node Cluster
-Deploy a production-like 3-node HA cluster using Docker Compose:
+Deploy 3-node cluster using Docker Compose:
 - Create a project directory and cd into it:
    ```
    mkdir pve_cluster; cd pve_cluster
@@ -271,6 +271,20 @@ docker compose down -t 0
 
 > [!Warning]
 > This setup uses the `--privileged` flag. The container can do almost everything the Linux host can do. Use with caution.
+
+---
+
+## Known Limitations
+
+### High Availability (HA) Not Supported
+
+Proxmox HA requires hardware watchdog fencing, which cannot work in containers:
+
+- Linux `/dev/watchdog` can only be used by one process at a time
+- Containers cannot fence (forcibly reboot) each other
+- VMs added to HA will stay stuck in "queued" state
+
+**For HA learning, use bare-metal or nested VMs instead.**
 
 ---
 
