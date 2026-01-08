@@ -65,6 +65,7 @@ apt install -y --no-install-recommends \
     bash-completion \
     dbus \
     iproute2 \
+    ifupdown2 \
     iputils-ping \
     sudo \
     wget \
