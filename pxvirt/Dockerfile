@@ -10,16 +10,18 @@
 # docker run -d --name pxvirt-1 --hostname pxvirt-1 \
 #     -p 2222:22 -p 3128:3128 -p 8006:8006 \
 #     --restart unless-stopped  \
-#     --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup \
-#     --device /dev/watchdog \
-#     -v /dev/vfio:/dev/vfio \
+#     --privileged --cgroupns=private \
+#     --device /dev/kvm \
 #     -v /usr/lib/modules:/usr/lib/modules:ro \
 #     -v /sys/kernel/security:/sys/kernel/security \
 #     -v ./VM-Backup:/var/lib/vz/dump \
 #     -v ./ISOs:/var/lib/vz/template/iso \
 #     pxvirt
+#
+# Set root password:
+#    docker exec -it pxvirt-1 passwd
 
-FROM debian:12
+FROM debian:12-slim
 
 # Set build time variables
 ARG DEBIAN_FRONTEND=noninteractive
@@ -27,53 +29,12 @@ ARG DEBIAN_FRONTEND=noninteractive
 # Set environment variables
 ENV TERM="xterm-256color"
 
-# Install base packages
+# Install curl
 RUN <<EOF
 apt update
 apt install -y --no-install-recommends \
-    systemd \
-    systemd-sysv \
-    bash-completion \
-    dbus \
-    iproute2 \
-    kmod \
-    sudo \
-    curl \
-    wget \
-    gnupg \
     ca-certificates \
-    locales \
-    procps \
-    apt-transport-https \
-    e2fsprogs \
-    btrfs-progs \
-    ntfs-3g \
-    nano \
-    vim-tiny \
-    less \
-    openssh-server \
-    whiptail \
-    cpio
-locale-gen en_US.UTF-8
-apt autoremove -y
-apt clean
-rm -rf /var/lib/apt/lists/*
-EOF
-
-# Install network packages
-RUN <<EOF
-apt update
-apt install -y --no-install-recommends \
-    iputils-ping \
-    ethtool \
-    traceroute \
-    dnsutils \
-    dnsmasq \
-    isc-dhcp-client \
-    wireguard-tools \
-    iptables \
-    bridge-utils
-apt autoremove -y
+    curl
 apt clean
 rm -rf /var/lib/apt/lists/*
 EOF
@@ -99,10 +60,46 @@ Pin: release *
 Pin-Priority: -1
 EOF
 
-# Install PXVIRT
+# Install base packages
 RUN <<EOF
-set -e
 apt update
+apt install -y --no-install-recommends \
+    systemd-sysv \
+    bash-completion \
+    dbus \
+    kmod \
+    sudo \
+    wget \
+    gnupg \
+    locales \
+    procps \
+    apt-transport-https \
+    e2fsprogs \
+    btrfs-progs \
+    ntfs-3g \
+    nano \
+    vim-tiny \
+    less \
+    openssh-server \
+    whiptail \
+    cpio
+locale-gen en_US.UTF-8
+
+# Install network packages
+apt install -y --no-install-recommends \
+    iputils-ping \
+    ifupdown2 \
+    iproute2 \
+    ethtool \
+    traceroute \
+    dnsutils \
+    dnsmasq \
+    isc-dhcp-client \
+    wireguard-tools \
+    iptables \
+    bridge-utils
+
+# Install PXVIRT
 apt install -y --no-install-recommends \
     postfix \
     xfsprogs \
@@ -117,18 +114,15 @@ apt install -y --no-install-recommends \
     pve-edk2-firmware \
     proxmox-firewall \
     proxmox-backup-restore-image \
-    proxmox-offline-mirror-helper \
-    ifupdown2
+    proxmox-offline-mirror-helper
 
 # Cleanup
 apt remove -y os-prober || true
-apt purge -y network-manager || true
 apt autoremove -y
 apt clean
 rm -rf /var/lib/apt/lists/*
 rm /etc/machine-id
 rm /var/lib/dbus/machine-id
-rm -rf /usr/lib/modules/*
 find /var/log -type f -delete
 EOF
 
@@ -138,7 +132,8 @@ systemctl mask \
     getty.target \
     console-getty.service \
     systemd-firstboot.service \
-    systemd-networkd-wait-online.service
+    systemd-networkd-wait-online.service \
+    watchdog-mux.service
 EOF
 
 # Prevent Docker DNS NAT rules from being flushed when using user-defined bridge
@@ -146,6 +141,13 @@ RUN systemctl mask nftables.service
 
 # Prevent pvenetcommit from overwriting /etc/network/interfaces
 RUN rm -f /etc/network/interfaces.new
+
+# No longer require restart after first boot
+RUN <<EOF
+update-alternatives --set iptables /usr/sbin/iptables-legacy
+update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
+update-alternatives --set ebtables /usr/sbin/ebtables-legacy
+EOF
 
 # Config /etc/network/interface
 COPY <<EOF /etc/network/interfaces
@@ -296,8 +298,19 @@ EOF1
 chmod +x /etc/rc.local
 EOF
 
-# Default share volumes
-VOLUME "/usr/lib/modules" "/sys/fs/cgroup" "/sys/kernel/security" "/dev/vfio"
+# Create entrypoint script
+COPY <<'EOF' /entrypoint.sh
+#!/bin/bash
+# Remount cgroup2 as read-write (F docker)
+if mount | grep -q '/sys/fs/cgroup.*ro,'; then
+    umount /sys/fs/cgroup
+    mount -t cgroup2 cgroup2 /sys/fs/cgroup -o rw,nosuid,nodev,noexec
+fi
+
+# Boot systemd init 
+exec /sbin/init
+EOF
+RUN chmod +x /entrypoint.sh
 
 # Set working dir
 WORKDIR "/root"
@@ -310,8 +323,8 @@ EXPOSE 22/tcp
 # Shutdown gracefully
 STOPSIGNAL SIGRTMIN+3
 
-# Boot with systemd init
-ENTRYPOINT ["/sbin/init"]
+# Run with entrypoint script
+ENTRYPOINT ["/entrypoint.sh"]
 
 # Labels & Annotations
 LABEL maintainer="LongQT-sea <long025733@gmail.com>"

@@ -43,10 +43,9 @@ docker run -d --name pve-1 --hostname pve-1 \
 ```
 Replace `./ISOs` with the path to your ISO folder.
 
-Set root password and restart the container at least once:
+Set root password:
 ```
 docker exec -it pve-1 passwd
-docker restart pve-1
 ```
 
 Access the web UI at `https://localhost:8006/` (accept the self-signed cert).
@@ -201,11 +200,6 @@ Set root password for all nodes:
    ```pwsh
    "pve-1","pve-2","pve-3" | % { docker exec $_ sh -c 'echo "root:123" | chpasswd' }
    ```
-
-Restart all nodes at least once:
-```
-docker restart -t 3 pve-1 pve-2 pve-3
-```
 
 > [!Tip]
 > Access nodes like this to avoid authentication conflicts ("invalid PVE ticket 401" errors caused by cookie collisions):

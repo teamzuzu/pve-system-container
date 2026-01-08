@@ -18,6 +18,9 @@
 #     -v ./VM-Backup:/var/lib/vz/dump \
 #     -v ./ISOs:/var/lib/vz/template/iso \
 #     proxmox-ve
+#
+# Set root password:
+#     docker exec -it pve-1 passwd
 
 FROM debian:13-slim
 
@@ -119,14 +122,12 @@ apt install -y --no-install-recommends \
 
 # Cleanup
 apt remove -y os-prober || true
-apt purge -y network-manager || true
 apt autoremove -y
 apt clean
 rm -rf /var/lib/apt/lists/*
 rm -f /etc/apt/sources.list.d/pve-enterprise.sources || true
 rm /etc/machine-id
 rm /var/lib/dbus/machine-id
-rm -rf /usr/lib/modules/*
 find /var/log -type f -delete
 EOF
 
@@ -145,6 +146,13 @@ RUN systemctl mask nftables.service
 
 # Prevent pvenetcommit from overwriting /etc/network/interfaces
 RUN rm -f /etc/network/interfaces.new
+
+# No longer require restart after first boot
+RUN <<EOF
+update-alternatives --set iptables /usr/sbin/iptables-legacy
+update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
+update-alternatives --set ebtables /usr/sbin/ebtables-legacy
+EOF
 
 # Config /etc/network/interface
 COPY <<EOF /etc/network/interfaces

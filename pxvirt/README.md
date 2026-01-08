@@ -7,7 +7,8 @@ Powered by [PXVIRT](https://docs.pxvirt.lierfang.com/en/README.html), a forked o
 docker run -d --name pxvirt-1 --hostname pxvirt-1 \
     -p 2222:22 -p 3128:3128 -p 8006:8006 \
     --restart unless-stopped  \
-    --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup \
+    --privileged --cgroupns=private \
+    --device /dev/kvm \
     -v /usr/lib/modules:/usr/lib/modules:ro \
     -v /sys/kernel/security:/sys/kernel/security \
     -v ./VM-Backup:/var/lib/vz/dump \
@@ -16,10 +17,9 @@ docker run -d --name pxvirt-1 --hostname pxvirt-1 \
 ```
 Replace `./ISOs` with the path to your ISO folder.
 
-Set root password and restart the container at least once:
+Set root password:
 ```
 docker exec -it pxvirt-1 passwd
-docker restart pxvirt-1
 ```
 
 Access the web UI at https://Docker-IP:8006 (accept the self-signed cert).
