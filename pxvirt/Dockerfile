@@ -145,7 +145,7 @@ EOF
 # Add signing keys to trustedkeys.gpg keyring for pveam
 RUN <<EOF
 gpg --keyserver keyserver.ubuntu.com --recv-keys \
-    39DE63C7D57A32124785E63DB859507D6B1F46D3 \
+    39DE63C7D57A32124785E63DB859507D6B1F46D3
 
 gpg --export \
     39DE63C7D57A32124785E63DB859507D6B1F46D3 \
