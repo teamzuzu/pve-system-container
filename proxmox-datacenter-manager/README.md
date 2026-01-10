@@ -4,8 +4,10 @@ Proxmox Datacenter Manager in Docker, why not!
 
 ## Quick start
 With `docker run`:
+> [!Note]
+> Remove `--detach` if you want an interactive console, to escape, hold CRTL then press P + Q
 ```bash
-docker run -d --name pdm --hostname pdm \
+docker run --detach -it --name pdm --hostname pdm \
     -p 8443:8443 -p 2222:22 \
     --restart unless-stopped \
     --cgroupns=private \
@@ -13,12 +15,15 @@ docker run -d --name pdm --hostname pdm \
     --security-opt apparmor=unconfined \
     --cap-add=SYS_ADMIN \
     --cap-add=NET_ADMIN \
+    --env PASSWORD=123 \
     ghcr.io/longqt-sea/proxmox-datacenter-manager
 ```
 
-Set root password:
+Default root password: `123`
+
+To attach to the console:
 ```
-docker exec -it pdm passwd
+docker attach pdm
 ```
 
 With Docker Compose:
@@ -29,6 +34,8 @@ services:
     container_name: pdm
     hostname: pdm
     restart: unless-stopped
+    stdin_open: true
+    tty: true
     cgroup: private
     cap_add:
       - SYS_ADMIN
@@ -39,15 +46,20 @@ services:
     ports:
       - "2222:22"
       - "8443:8443"
+    environment:
+      - PASSWORD=123
 ```
 Bring it up:
 ```
 docker compose up -d
 ```
 
-Set root password:
+Default root password: `123`
+
+To attach to the console:
 ```
-docker exec -it pdm passwd
+docker attach pdm
 ```
+To escape, hold CRTL then press P + Q
 
 Access the web UI at https://Docker-IP:8443 (accept the self-signed cert).

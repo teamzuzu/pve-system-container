@@ -7,17 +7,15 @@
 # docker build -t proxmox-datacenter-manager .
 #
 # Run:
-# docker run -d --name pdm --hostname pdm \
+# docker run -dit --hostname pdm --name pdm \
 #    -p 8443:8443 -p 2222:22 \
 #    --cgroupns=private \
 #    --security-opt seccomp=profile.json \
 #    --security-opt apparmor=unconfined \
 #    --cap-add=SYS_ADMIN \
 #    --cap-add=NET-ADMIN \
+#    -e PASSWORD=123 \
 #    proxmox-datacenter-manager
-#
-# Set root password:
-#    docker exec -it pdm passwd
 
 FROM debian:13-slim
 
@@ -103,12 +101,9 @@ EOF
 # Mask unneeded services in container
 RUN <<EOF
 systemctl mask \
-    getty.target \
-    console-getty.service \
     systemd-udevd.service \
     systemd-modules-load.service \
     systemd-networkd-wait-online.service \
-    systemd-firstboot.service \
     proc-sys-fs-binfmt_misc.automount \
     sys-kernel-config.mount \
     sys-kernel-debug.mount \
@@ -150,16 +145,24 @@ EOF
 # Create entrypoint script
 COPY <<'EOF' /entrypoint.sh
 #!/bin/bash
-# Remount cgroup2 as read-write (F docker)
-if mount | grep -q '/sys/fs/cgroup.*ro,'; then
-    umount /sys/fs/cgroup
-    mount -t cgroup2 cgroup2 /sys/fs/cgroup -o rw,nosuid,nodev,noexec
+# Remount these as read-write (F docker)
+mount -o remount,rw /sys/fs/cgroup 2>/dev/null
+mount -o remount,rw /proc/sys 2>/dev/null
+
+# Set root password
+if [ -n "$PASSWORD" ]; then
+    echo "root:$PASSWORD" | chpasswd
 fi
 
-# Boot systemd init 
-exec /sbin/init
+exec "$@"
 EOF
 RUN chmod +x /entrypoint.sh
+
+# Run with custom entrypoint script
+ENTRYPOINT ["/entrypoint.sh"]
+
+# Default command to systemd init
+CMD ["/sbin/init", "--log-target=console", "--log-level=info"]
 
 # Set working dir
 WORKDIR "/root"
@@ -170,9 +173,6 @@ EXPOSE 22/tcp
 
 # Shutdown gracefully
 STOPSIGNAL SIGRTMIN+3
-
-# Run with entrypoint script
-ENTRYPOINT ["/entrypoint.sh"]
 
 # Labels & Annotations
 LABEL maintainer="LongQT-sea <long025733@gmail.com>"

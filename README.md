@@ -16,7 +16,7 @@ Proxmox cluster in Docker. Learn, test, break, and repeat.
 ## Requirements
 
 - Modern Linux host with kernel 6.8+
-- [Docker Engine](https://docs.docker.com/engine/install/)
+- [Docker Engine](https://docs.docker.com/engine/install/) (version 27+ recommended)
 - Intel VT-x / AMD-V enabled
 - macOS: Use [OrbStack](https://orbstack.dev/) instead of Docker Desktop
 - Windows 11 with Docker Desktop (WSL2):
@@ -28,9 +28,10 @@ Proxmox cluster in Docker. Learn, test, break, and repeat.
 ## Quick Start
 Standalone node with `docker run`:
 > [!Note]
-> On ARM64 platforms, use `proxmox-ve-arm64` instead of `proxmox-ve`
+> - On ARM64 platforms, use `proxmox-ve-arm64` instead of `proxmox-ve`
+> - Remove `--detach` if you want an interactive console, to escape, hold CRTL and press P + Q
 ```bash
-docker run -d --name pve-1 --hostname pve-1 \
+docker run --detach -it --name pve-1 --hostname pve-1 \
     -p 2222:22 -p 3128:3128 -p 8006:8006 \
     --restart unless-stopped  \
     --privileged --cgroupns=private \
@@ -40,14 +41,12 @@ docker run -d --name pve-1 --hostname pve-1 \
     -v /sys/kernel/security:/sys/kernel/security \
     -v ./VM-Backup:/var/lib/vz/dump \
     -v ./ISOs:/var/lib/vz/template/iso \
+    --env PASSWORD=123 \
     ghcr.io/longqt-sea/proxmox-ve
 ```
 Replace `./ISOs` with the path to your ISO folder.
 
-Set root password:
-```
-docker exec -it pve-1 passwd
-```
+Default root password: `123`
 
 Access the web UI at `https://localhost:8006/` (accept the self-signed cert).
 
@@ -62,92 +61,87 @@ Deploy 3-node cluster using Docker Compose:
 
 - Create a `compose.yml` file in the `pve_cluster` directory with the following content:
 ```yaml
+# Common option
+x-service: &systemd
+  restart: unless-stopped
+  stdin_open: true
+  tty: true
+  cgroup: private
+
+x-pve-service: &pve-systemd
+  <<: *systemd
+  image: ghcr.io/longqt-sea/proxmox-ve
+  privileged: true
+  shm_size: 1g
+  devices:
+    - /dev/kvm
+  volumes:
+    - /usr/lib/modules:/usr/lib/modules:ro        # Required for loading kernel modules
+    - /sys/kernel/security:/sys/kernel/security   # Optional, needed for LXC
+    - ./VM-Backup:/var/lib/vz/dump                # Shared storage for VM/LXC backups
+    - ./ISOs:/var/lib/vz/template/iso             # Shared storage for ISO files
+
+# Set default root password
+x-env: &password
+  PASSWORD: "123"
+
+
 services:
   # First node
   pve-1:
-    image: ghcr.io/longqt-sea/proxmox-ve
     container_name: pve-1
     hostname: pve-1
-    privileged: true
-    restart: unless-stopped
-    cgroup: private
-    shm_size: 1g
-    devices:
-      - /dev/kvm
+    <<: *pve-systemd
+    environment:
+      <<: *password
     networks:
       dual_stack:
         ipv4_address: 10.0.99.1
         ipv6_address: fd00::1
-
-    # Port mapping only required for Docker Desktop or LAN access from other machines.
+    
+    # Port mapping only required for Docker Desktop or remote access from other machines.
     ports:
       - "2222:22"
       - "3128:3128"
       - "8006:8006"   # First node container port 8006 maps to host port 8006
 
-    volumes:
-      - /usr/lib/modules:/usr/lib/modules:ro        # Required for loading kernel modules
-      - /sys/kernel/security:/sys/kernel/security   # Optional, needed for LXC
-      - ./VM-Backup:/var/lib/vz/dump                # Shared storage for VM/LXC backups
-      - ./ISOs:/var/lib/vz/template/iso             # Shared storage for ISO files
-
 
   # Second node
   pve-2:
-    image: ghcr.io/longqt-sea/proxmox-ve
     container_name: pve-2
     hostname: pve-2
-    privileged: true
-    restart: unless-stopped
-    cgroup: private
-    shm_size: 1g
-    devices:
-      - /dev/kvm
+    <<: *pve-systemd
+    environment:
+      <<: *password
     networks:
       dual_stack:
         ipv4_address: 10.0.99.2
         ipv6_address: fd00::2
-
-    # Port mapping only required for Docker Desktop or LAN access from other machines.
+    
+    # Port mapping only required for Docker Desktop or remote access from other machines.
     ports:
       - "2223:22"
       - "3129:3128"
       - "8007:8006"   # Second node container port 8006 maps to host port 8007
 
-    volumes:
-      - /usr/lib/modules:/usr/lib/modules:ro        # Required for loading kernel modules
-      - /sys/kernel/security:/sys/kernel/security   # Optional, needed for LXC
-      - ./VM-Backup:/var/lib/vz/dump                # Shared storage for VM/LXC backups
-      - ./ISOs:/var/lib/vz/template/iso             # Shared storage for ISO files
-
 
   # Third node
   pve-3:
-    image: ghcr.io/longqt-sea/proxmox-ve
     container_name: pve-3
     hostname: pve-3
-    privileged: true
-    restart: unless-stopped
-    cgroup: private
-    shm_size: 1g
-    devices:
-      - /dev/kvm
+    <<: *pve-systemd
+    environment:
+      <<: *password
     networks:
       dual_stack:
         ipv4_address: 10.0.99.3
         ipv6_address: fd00::3
-
-    # Port mapping only required for Docker Desktop or LAN access from other machines.
+    
+    # Port mapping only required for Docker Desktop or remote access from other machines.
     ports:
       - "2224:22"
       - "3130:3128"
       - "8008:8006"   # Third node container port 8006 maps to host port 8008
-
-    volumes:
-      - /usr/lib/modules:/usr/lib/modules:ro        # Required for loading kernel modules
-      - /sys/kernel/security:/sys/kernel/security   # Optional, needed for LXC
-      - ./VM-Backup:/var/lib/vz/dump                # Shared storage for VM/LXC backups
-      - ./ISOs:/var/lib/vz/template/iso             # Shared storage for ISO files
 
 
   # Optional: Proxmox Datacenter Manager
@@ -155,9 +149,9 @@ services:
     image: ghcr.io/longqt-sea/proxmox-datacenter-manager
     container_name: pdm
     hostname: pdm
-    restart: unless-stopped
-    cgroup: private
-    shm_size: 1g
+    <<: *systemd
+    environment:
+      <<: *password
     cap_add:
       - SYS_ADMIN
       - NET_ADMIN
@@ -168,12 +162,9 @@ services:
       dual_stack:
         ipv4_address: 10.0.99.4
         ipv6_address: fd00::4
-
-    # Port mapping only required for Docker Desktop or LAN access from other machines.
     ports:
       - "2225:22"
       - "8443:8443"
-
 
 # Dual-stack network for this cluster
 networks:
@@ -191,19 +182,10 @@ Bring it up:
 docker compose up -d
 ```
 
-Set root password for all nodes:
-> Replace `123` with your own password
-- Linux/macOS Terminal:
-   ```bash
-   for c in pve-1 pve-2 pve-3; do docker exec $c sh -c 'echo "root:123" | chpasswd'; done
-   ```
-- Windows Powershell:
-   ```pwsh
-   "pve-1","pve-2","pve-3" | % { docker exec $_ sh -c 'echo "root:123" | chpasswd' }
-   ```
+Default root password: `123`
 
 > [!Tip]
-> Access nodes like this to avoid authentication conflicts ("invalid PVE ticket 401" errors caused by cookie collisions):
+> Access nodes like this to avoid authentication conflicts ("invalid PVE ticket 401"):
 >
 > | Environment | How to access nodes |  Example |
 > |------------|---------------------|----------|
@@ -243,7 +225,7 @@ docker compose down -t 0
 |------|--------------|
 | 8006 | Proxmox VE Web UI |
 | 3128 | SPICE proxy |
-| 22 | OpenSSH |
+| 22   | OpenSSH |
 | 8443 | Proxmox Datacenter Manager Web UI |
 
 ## Volumes
