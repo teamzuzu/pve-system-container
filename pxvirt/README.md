@@ -10,8 +10,13 @@ Powered by [PXVIRT](https://docs.pxvirt.lierfang.com/en/README.html), a forked o
 docker run --detach -it --name pxvirt-1 --hostname pxvirt-1 \
     -p 2222:22 -p 3128:3128 -p 8006:8006 \
     --restart unless-stopped  \
-    --privileged --cgroupns=private \
-    --device /dev/kvm \
+    --cgroupns=private \
+    --security-opt seccomp=unconfined \
+    --cap-add=SYS_ADMIN \
+    --cap-add=NET_ADMIN \
+    --cap-add=SYS_MODULE \
+    --cap-add=IPC_LOCK \
+    --device-cgroup-rule='a *:* rwm' \
     -v /usr/lib/modules:/usr/lib/modules:ro \
     -v /sys/kernel/security:/sys/kernel/security \
     -v ./VM-Backup:/var/lib/vz/dump \
