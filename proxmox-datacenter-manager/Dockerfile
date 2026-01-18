@@ -67,6 +67,7 @@ apt install -y --no-install-recommends \
     ifupdown2 \
     bridge-utils \
     iputils-ping \
+    isc-dhcp-client \
     sudo \
     wget \
     locales \
