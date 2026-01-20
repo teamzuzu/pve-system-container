@@ -150,10 +150,9 @@ COPY <<'EOF' /entrypoint.sh
 mount -o remount,rw /sys/fs/cgroup 2>/dev/null
 mount -o remount,rw /proc/sys 2>/dev/null
 
-# Set root password
-if [ -n "$PASSWORD" ] && [ ! -f /etc/.firstboot.done ]; then
+# Set root password on first boot
+if [ -n "$PASSWORD" ] && [ ! -f /etc/machine-id ]; then
     echo "root:$PASSWORD" | chpasswd
-    touch /etc/.firstboot.done
 fi
 
 exec "$@"

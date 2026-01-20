@@ -355,10 +355,9 @@ chmod 666 /dev/kvm /dev/zfs
 chmod 660 /dev/loop-control
 chmod 600 /dev/mapper/control
 
-# Set root password
-if [ -n "$PASSWORD" ] && [ ! -f /etc/.firstboot.done ]; then
+# Set root password on first boot
+if [ -n "$PASSWORD" ] && [ ! -f /etc/machine-id ]; then
     echo "root:$PASSWORD" | chpasswd
-    touch /etc/.firstboot.done
 fi
 
 exec "$@"
