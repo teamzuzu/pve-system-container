@@ -151,8 +151,9 @@ mount -o remount,rw /sys/fs/cgroup 2>/dev/null
 mount -o remount,rw /proc/sys 2>/dev/null
 
 # Set root password
-if [ -n "$PASSWORD" ]; then
+if [ -n "$PASSWORD" ] && [ ! -f /etc/.firstboot.done ]; then
     echo "root:$PASSWORD" | chpasswd
+    touch /etc/.firstboot.done
 fi
 
 exec "$@"

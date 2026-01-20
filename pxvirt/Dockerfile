@@ -354,8 +354,9 @@ chmod 660 /dev/loop-control
 chmod 600 /dev/mapper/control
 
 # Set root password
-if [ -n "$PASSWORD" ]; then
+if [ -n "$PASSWORD" ] && [ ! -f /etc/.firstboot.done ]; then
     echo "root:$PASSWORD" | chpasswd
+    touch /etc/.firstboot.done
 fi
 
 exec "$@"
